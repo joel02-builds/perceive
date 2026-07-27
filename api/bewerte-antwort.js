@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { parseClaudeJson } from './_utils.js'
+import { berechneNaechsteWiederholung } from '../src/lib/spacedRepetition.js'
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -44,7 +45,15 @@ Wichtig: Sei ermutigend. Kein "Falsch" oder "Leider". Fokus auf was der Nutzer v
     })
 
     const parsed = parseClaudeJson(message.content[0].text)
-    return res.status(200).json(parsed)
+    const naechsteWiederholung = berechneNaechsteWiederholung(
+      parsed.status,
+      req.body.aktuelleWiederholungen || 0
+    )
+
+    return res.status(200).json({
+      ...parsed,
+      naechste_wiederholung: naechsteWiederholung,
+    })
   } catch (err) {
     console.error('Vollständiger Fehler:', err)
     return res.status(500).json({ error: err.message, stack: err.stack })

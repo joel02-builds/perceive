@@ -18,7 +18,8 @@ const TAGESZEITEN = [
 const LADE_TEXTE = [
   'Per liest deine Unterlagen…',
   'Ich erkenne die wichtigsten Themen…',
-  'Fast fertig — ich teile alles in Blöcke auf…',
+  'Ich teile alles in klare Blöcke auf…',
+  'Fast fertig — ich prüfe was prüfungsrelevant ist…',
 ]
 
 function toDateStr(date) {

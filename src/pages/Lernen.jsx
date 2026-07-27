@@ -19,6 +19,7 @@ export default function Lernen() {
   const navigate = useNavigate()
 
   const [block, setBlock] = useState(null)
+  const [aktuellerFortschritt, setAktuellerFortschritt] = useState(null)
   const [frageData, setFrageData] = useState(null)
   const [antwort, setAntwort] = useState('')
   const [zeigeHinweis, setZeigeHinweis] = useState(false)
@@ -41,6 +42,15 @@ export default function Lernen() {
         return
       }
       setBlock(blockData)
+
+      const { data: fortschrittData } = await supabase
+        .from('fortschritt')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('block_id', blockId)
+        .maybeSingle()
+      setAktuellerFortschritt(fortschrittData)
+
       setPhase('lade-frage')
 
       try {
@@ -63,7 +73,7 @@ export default function Lernen() {
       }
     }
     init()
-  }, [blockId])
+  }, [blockId, user])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -79,6 +89,7 @@ export default function Lernen() {
           antwort,
           musterantwort: frageData.musterantwort,
           blockInhalt: block.inhalt,
+          aktuelleWiederholungen: aktuellerFortschritt?.versuche || 0,
         }),
       })
       const data = await res.json()
@@ -91,6 +102,8 @@ export default function Lernen() {
           block_id: blockId,
           status: data.status,
           letzte_wiederholung: new Date().toISOString(),
+          naechste_wiederholung: data.naechste_wiederholung,
+          versuche: (aktuellerFortschritt?.versuche || 0) + 1,
         },
         { onConflict: 'user_id,block_id' }
       )
@@ -203,6 +216,19 @@ export default function Lernen() {
         {phase === 'ergebnis' && ergebnis && (
           <div className="mt-6 flex flex-col gap-4">
             <div className="rounded-xl border border-perceive-border bg-perceive-card p-6 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
+              {ergebnis.status === 'beherrscht' && (
+                <div className="mb-4 flex items-center gap-3">
+                  <img
+                    src="/per.png"
+                    alt="Per"
+                    style={{ width: 60, height: 60, objectFit: 'contain', mixBlendMode: 'multiply' }}
+                  />
+                  <p className="font-serif text-lg text-perceive-text dark:text-perceive-bg">
+                    Sehr gut. Dieser Block sitzt. ⚡
+                  </p>
+                </div>
+              )}
+
               <span className="inline-block rounded-full bg-perceive-accent/10 px-3 py-1 text-sm font-medium text-perceive-accent">
                 {STATUS_LABEL[ergebnis.status] ?? ergebnis.status}
               </span>

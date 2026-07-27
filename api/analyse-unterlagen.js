@@ -13,32 +13,40 @@ export default async function handler(req, res) {
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  const prompt = `Du bist ein Lernexperte für Studierende mit ADHS. Analysiere den folgenden Lernstoff für das Fach "${fachName}" und strukturiere ihn in klar abgegrenzte Lernblöcke.
+  const prompt = `Du bist ein Lernexperte für Studierende mit ADHS der Prüfungsunterlagen analysiert.
 
-WICHTIG: Antworte NUR mit validem JSON, keine Erklärungen, kein Markdown.
+Deine Aufgabe: Strukturiere den Lernstoff in PRÜFUNGSRELEVANTE Blöcke die wirklich beim Bestehen helfen.
+
+WICHTIG: Antworte NUR mit validem JSON, kein Markdown, keine Erklärungen.
+
+Prüfungsdatum: ${pruefungsdatum}
+Fach: ${fachName}
+
+Analyse-Regeln:
+- Maximal 8 Blöcke — lieber 5 sehr gute als 8 mittelmäßige
+- Jeder Block = GENAU EIN Konzept/Thema das man verstehen muss
+- Priorisiere was wirklich prüfungsrelevant ist — lass Hintergrundwissen weg
+- Inhaltsfelder/Themen die explizit im Lehrplan stehen: höchste Priorität
+- Jeder Block muss in 8-12 Minuten lernbar sein — wenn nicht: aufteilen
+- Einfache direkte Sprache — kein Fachjargon ohne sofortige Erklärung
+- Die Kernaussage muss der eine Satz sein den man in der Prüfung braucht
 
 Format:
 {
   "bloecke": [
     {
-      "titel": "Kurzer, klarer Titel des Blocks",
-      "inhalt": "Der Lerninhalt dieses Blocks — klar, verständlich, in einfacher Sprache erklärt. Maximal 200 Wörter pro Block.",
-      "kernaussage": "Die eine wichtigste Aussage dieses Blocks in einem Satz",
+      "titel": "Kurzer prägnanter Titel — max 6 Wörter",
+      "inhalt": "Klar erklärter Lerninhalt — nur was prüfungsrelevant ist. Max 150 Wörter. Einfache Sprache. Konkrete Beispiele wo möglich.",
+      "kernaussage": "Der EINE Satz den man für die Prüfung wissen muss",
       "schwierigkeit": 3,
-      "reihenfolge": 1
+      "reihenfolge": 1,
+      "pruefungsrelevanz": "hoch" | "mittel"
     }
   ]
 }
 
-Regeln:
-- Maximal 8-10 Blöcke — lieber weniger, dafür klar
-- Jeder Block hat genau EINE Kernaussage
-- Inhalt in einfacher, direkter Sprache — keine Fachsprache ohne Erklärung
-- Schwierigkeit 1-5 (1=sehr einfach, 5=sehr schwer)
-- Reihenfolge logisch aufbauend
-
 Lernstoff:
-${text.substring(0, 8000)}`
+${text.substring(0, 10000)}`
 
   try {
     const message = await client.messages.create({
