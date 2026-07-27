@@ -51,7 +51,7 @@ ${text.substring(0, 8000)}`
     const parsed = parseClaudeJson(responseText)
     return res.status(200).json(parsed)
   } catch (err) {
-    console.error('Analyse-Fehler:', err.message)
-    return res.status(500).json({ error: err.message })
+    console.error('Vollständiger Fehler:', err)
+    return res.status(500).json({ error: err.message, stack: err.stack })
   }
 }

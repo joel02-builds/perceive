@@ -43,7 +43,7 @@ Die Frage soll:
     const parsed = parseClaudeJson(message.content[0].text)
     return res.status(200).json(parsed)
   } catch (err) {
-    console.error('Frage-Fehler:', err.message)
-    return res.status(500).json({ error: err.message })
+    console.error('Vollständiger Fehler:', err)
+    return res.status(500).json({ error: err.message, stack: err.stack })
   }
 }

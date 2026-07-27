@@ -46,7 +46,7 @@ Wichtig: Sei ermutigend. Kein "Falsch" oder "Leider". Fokus auf was der Nutzer v
     const parsed = parseClaudeJson(message.content[0].text)
     return res.status(200).json(parsed)
   } catch (err) {
-    console.error('Bewertungs-Fehler:', err.message)
-    return res.status(500).json({ error: err.message })
+    console.error('Vollständiger Fehler:', err)
+    return res.status(500).json({ error: err.message, stack: err.stack })
   }
 }
