@@ -23,9 +23,8 @@ export default function Lernen() {
   const [frageData, setFrageData] = useState(null)
   const [antwort, setAntwort] = useState('')
   const [zeigeHinweis, setZeigeHinweis] = useState(false)
-  const [zeigeInhalt, setZeigeInhalt] = useState(false)
   const [ergebnis, setErgebnis] = useState(null)
-  const [phase, setPhase] = useState('lade-block')
+  const [phase, setPhase] = useState('laedt') // 'laedt' | 'lesen' | 'recall' | 'bewertet' | 'feedback' | 'error'
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -51,29 +50,42 @@ export default function Lernen() {
         .maybeSingle()
       setAktuellerFortschritt(fortschrittData)
 
-      setPhase('lade-frage')
+      setPhase('lesen')
+    }
+    init()
+  }, [blockId, user])
 
+  useEffect(() => {
+    if (phase !== 'recall' || frageData || !block) return
+
+    let cancelled = false
+    async function ladeFrage() {
       try {
         const res = await fetch('/api/generate-frage', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            blockTitel: blockData.titel,
-            blockInhalt: blockData.inhalt,
-            kernaussage: blockData.kernaussage,
+            blockTitel: block.titel,
+            blockInhalt: block.inhalt,
+            kernaussage: block.kernaussage,
           }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Frage konnte nicht erstellt werden')
-        setFrageData(data)
-        setPhase('frage')
+        if (!cancelled) setFrageData(data)
       } catch (err) {
-        setError(err.message)
-        setPhase('error')
+        if (!cancelled) {
+          setError(err.message)
+          setPhase('error')
+        }
       }
     }
-    init()
-  }, [blockId, user])
+    ladeFrage()
+
+    return () => {
+      cancelled = true
+    }
+  }, [phase, frageData, block])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -115,19 +127,17 @@ export default function Lernen() {
         .eq('block_id', blockId)
         .eq('datum', toDateStr(new Date()))
 
-      setPhase('ergebnis')
+      setPhase('feedback')
     } catch (err) {
       setError(err.message)
       setPhase('error')
     }
   }
 
-  if (phase === 'lade-block' || phase === 'lade-frage') {
+  if (phase === 'laedt') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-perceive-bg dark:bg-perceive-darkbg">
-        <p className="text-perceive-muted">
-          {phase === 'lade-block' ? 'Lädt…' : 'Per bereitet deine Frage vor…'}
-        </p>
+        <p className="text-perceive-muted">Lädt…</p>
       </div>
     )
   }
@@ -155,75 +165,111 @@ export default function Lernen() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-4">
-        <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
-          {block?.titel}
-        </h1>
+        {phase === 'lesen' && (
+          <div>
+            <p className="mb-2 text-sm tracking-wide text-perceive-muted">
+              LIES DAS DURCH — DANN ERKLÄRE ES
+            </p>
+            <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
+              {block?.titel}
+            </h1>
 
-        {phase !== 'ergebnis' && (
-          <div className="mt-6 rounded-xl border border-perceive-border bg-perceive-card p-6 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
-            <p className="font-medium text-perceive-text dark:text-perceive-bg">
-              {frageData?.frage}
+            {block?.kernaussage && (
+              <div
+                style={{
+                  background: '#F0F7F4',
+                  borderLeft: '3px solid #5BA08A',
+                  borderRadius: 8,
+                  padding: '1rem',
+                  marginTop: '1rem',
+                  marginBottom: '1rem',
+                }}
+              >
+                <p style={{ fontWeight: 600, color: '#5BA08A', marginBottom: '0.5rem' }}>
+                  Das Wichtigste:
+                </p>
+                <p className="text-perceive-text dark:text-perceive-bg">{block?.kernaussage}</p>
+              </div>
+            )}
+
+            <p className="whitespace-pre-wrap text-perceive-text dark:text-perceive-bg">
+              {block?.inhalt}
             </p>
 
-            {zeigeHinweis && (
-              <p className="mt-3 text-sm text-perceive-amber">{frageData?.hinweis}</p>
-            )}
-
-            <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-              <textarea
-                autoFocus
-                rows={5}
-                placeholder="Schreib in eigenen Worten, was du verstanden hast…"
-                value={antwort}
-                onChange={(e) => setAntwort(e.target.value)}
-                disabled={phase === 'bewertet'}
-                className="rounded-lg border border-perceive-border bg-transparent px-4 py-3 text-perceive-text outline-none focus:border-perceive-primary disabled:opacity-50 dark:text-perceive-bg"
-              />
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => setZeigeHinweis(true)}
-                  className="rounded-lg border border-perceive-border px-4 py-2 text-sm text-perceive-muted transition hover:bg-perceive-bg dark:hover:bg-perceive-darkbg"
-                >
-                  Ich komme nicht weiter
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZeigeInhalt((v) => !v)}
-                  className="rounded-lg border border-perceive-border px-4 py-2 text-sm text-perceive-muted transition hover:bg-perceive-bg dark:hover:bg-perceive-darkbg"
-                >
-                  {zeigeInhalt ? 'Inhalt verbergen' : 'Blockinhalt anzeigen'}
-                </button>
-                <button
-                  type="submit"
-                  disabled={!antwort.trim() || phase === 'bewertet'}
-                  className="ml-auto rounded-lg bg-perceive-primary px-5 py-2 text-white transition hover:opacity-90 disabled:opacity-40"
-                >
-                  {phase === 'bewertet' ? 'Per denkt nach…' : 'Antwort abschicken'}
-                </button>
-              </div>
-            </form>
-
-            {zeigeInhalt && (
-              <div className="mt-4 rounded-lg bg-perceive-bg p-4 text-sm text-perceive-text dark:bg-perceive-darkbg dark:text-perceive-bg">
-                <p className="whitespace-pre-wrap">{block?.inhalt}</p>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setPhase('recall')}
+              className="mt-6 rounded-lg bg-perceive-primary px-5 py-3 text-white transition hover:opacity-90"
+            >
+              Ich habe es gelesen — jetzt testen ✓
+            </button>
           </div>
         )}
 
-        {phase === 'ergebnis' && ergebnis && (
+        {(phase === 'recall' || phase === 'bewertet') && (
+          <>
+            <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
+              {block?.titel}
+            </h1>
+
+            <div className="mt-6 rounded-xl border border-perceive-border bg-perceive-card p-6 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
+              {!frageData ? (
+                <p className="text-perceive-muted">Per bereitet deine Frage vor…</p>
+              ) : (
+                <>
+                  <p className="font-medium text-perceive-text dark:text-perceive-bg">
+                    {frageData.frage}
+                  </p>
+
+                  {zeigeHinweis && (
+                    <p className="mt-3 text-sm text-perceive-amber">{block?.kernaussage}</p>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+                    <textarea
+                      autoFocus
+                      rows={5}
+                      placeholder="Schreib in eigenen Worten, was du verstanden hast…"
+                      value={antwort}
+                      onChange={(e) => setAntwort(e.target.value)}
+                      disabled={phase === 'bewertet'}
+                      className="rounded-lg border border-perceive-border bg-transparent px-4 py-3 text-perceive-text outline-none focus:border-perceive-primary disabled:opacity-50 dark:text-perceive-bg"
+                    />
+
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setZeigeHinweis(true)}
+                        className="rounded-lg border border-perceive-border px-4 py-2 text-sm text-perceive-muted transition hover:bg-perceive-bg dark:hover:bg-perceive-darkbg"
+                      >
+                        Ich komme nicht weiter
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!antwort.trim() || phase === 'bewertet'}
+                        className="ml-auto rounded-lg bg-perceive-primary px-5 py-2 text-white transition hover:opacity-90 disabled:opacity-40"
+                      >
+                        {phase === 'bewertet' ? 'Per denkt nach…' : 'Antwort abschicken'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {phase === 'feedback' && ergebnis && (
           <div className="mt-6 flex flex-col gap-4">
             <div className="rounded-xl border border-perceive-border bg-perceive-card p-6 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
               {ergebnis.status === 'beherrscht' && (
-                <div className="mb-4 flex items-center gap-3">
+                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                   <img
                     src="/per.png"
                     alt="Per"
                     style={{ width: 60, height: 60, objectFit: 'contain', mixBlendMode: 'multiply' }}
                   />
-                  <p className="font-serif text-lg text-perceive-text dark:text-perceive-bg">
+                  <p style={{ fontFamily: 'Fraunces, serif', color: '#3D6B8E' }}>
                     Sehr gut. Dieser Block sitzt. ⚡
                   </p>
                 </div>
