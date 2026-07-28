@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { istFaellig } from '../lib/spacedRepetition'
 import { buildTodaysPlan } from '../utils/buildTodaysPlan'
 import EnergyCheckScreen from '../components/EnergyCheckScreen'
 
@@ -12,6 +13,8 @@ const ENERGIE_PILL = {
   okay: { emoji: '😐', label: 'Geht so' },
   muede: { emoji: '😴', label: 'Müde' },
 }
+
+const WOCHENTAGE_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
 function heutigesDatum() {
   return new Date().toISOString().slice(0, 10)
@@ -38,6 +41,41 @@ function tageBisPruefung(pruefungsdatum) {
   return Math.ceil((pruefung - heute) / (1000 * 60 * 60 * 24))
 }
 
+function pruefungsdatumFarbe(tage) {
+  if (tage === null) return 'text-perceive-muted'
+  if (tage < 7) return 'text-[#C0392B]'
+  if (tage <= 14) return 'text-perceive-amber'
+  return 'text-perceive-muted'
+}
+
+// Gruppiert alle Blöcke nach naechste_wiederholung für die nächsten 6 Tage.
+// Überfällige und neue (naechste_wiederholung = null) Blöcke zählen zu "heute".
+function berechneWochenVorschau(allBlocks) {
+  const heute = new Date()
+  heute.setHours(0, 0, 0, 0)
+
+  const tage = Array.from({ length: 6 }, (_, i) => {
+    const datum = new Date(heute)
+    datum.setDate(datum.getDate() + i)
+    return datum
+  })
+  const zaehler = tage.map(() => 0)
+
+  for (const block of allBlocks) {
+    const datum = block.naechste_wiederholung ? new Date(block.naechste_wiederholung) : heute
+    datum.setHours(0, 0, 0, 0)
+
+    if (datum <= heute) {
+      zaehler[0] += 1
+      continue
+    }
+    const diffTage = Math.round((datum - heute) / (1000 * 60 * 60 * 24))
+    if (diffTage < 6) zaehler[diffTage] += 1
+  }
+
+  return tage.map((datum, i) => ({ datum, anzahl: zaehler[i] }))
+}
+
 export default function Dashboard() {
   const { user, signOut } = useAuth()
   const [energyLevel, setEnergyLevel] = useState(() => leseGespeicherteEnergie())
@@ -45,6 +83,7 @@ export default function Dashboard() {
   const [bloecke, setBloecke] = useState([])
   const [fortschritt, setFortschritt] = useState([])
   const [loading, setLoading] = useState(true)
+  const [avatarMenuOffen, setAvatarMenuOffen] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -106,23 +145,72 @@ export default function Dashboard() {
   }))
 
   const heutigeItems = buildTodaysPlan(allBlocksMitFortschritt, energyLevel)
+  const [heroItem, ...restItems] = heutigeItems
   const energiePill = ENERGIE_PILL[energyLevel]
+  const wochenVorschau = berechneWochenVorschau(allBlocksMitFortschritt)
+  const initiale = user?.email?.[0]?.toUpperCase() ?? '?'
+
+  function renderBadges(item) {
+    const badge = fortschrittMap.has(item.id) ? 'Wiederholen' : 'Neu'
+    return (
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        <span
+          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            badge === 'Neu'
+              ? 'bg-perceive-accent/10 text-perceive-accent'
+              : 'bg-perceive-amber/10 text-perceive-amber'
+          }`}
+        >
+          {badge}
+        </span>
+        {item.examCritical ? (
+          <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
+            Prüfung in {item.tageBisPruefung} {item.tageBisPruefung === 1 ? 'Tag' : 'Tagen'}!
+          </span>
+        ) : item.examUrgent ? (
+          <span className="inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+            Prüfung bald
+          </span>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-perceive-bg dark:bg-perceive-darkbg">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-        <span className="font-serif text-xl font-semibold text-perceive-text dark:text-perceive-bg">
+        <span className="font-serif text-xl font-bold text-perceive-text dark:text-perceive-bg">
           Perceive
         </span>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-perceive-muted">{user?.email}</span>
+        <div className="relative">
           <button
             type="button"
-            onClick={signOut}
-            className="text-sm text-perceive-muted hover:text-perceive-primary"
+            onClick={() => setAvatarMenuOffen((offen) => !offen)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-perceive-primary text-sm font-medium text-white transition hover:opacity-90"
           >
-            Abmelden
+            {initiale}
           </button>
+
+          {avatarMenuOffen && (
+            <>
+              <button
+                type="button"
+                aria-label="Menü schließen"
+                onClick={() => setAvatarMenuOffen(false)}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-perceive-border bg-perceive-card p-3 shadow-md dark:border-gray-700 dark:bg-perceive-darkcard">
+                <p className="truncate text-sm text-perceive-muted">{user?.email}</p>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="mt-2 w-full rounded-lg border border-perceive-border px-3 py-2 text-left text-sm text-perceive-text transition hover:bg-perceive-bg dark:border-gray-700 dark:text-perceive-bg dark:hover:bg-perceive-darkbg"
+                >
+                  Abmelden
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -166,7 +254,7 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {heutigeItems.length === 0 ? (
+              {!heroItem ? (
                 <div className="flex items-center gap-4 rounded-xl border border-perceive-border bg-perceive-card p-5 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
                   <img
                     src="/per.png"
@@ -179,51 +267,76 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {heutigeItems.map((item) => {
-                    const badge = fortschrittMap.has(item.id) ? 'Wiederholen' : 'Neu'
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex flex-col items-start justify-between gap-3 rounded-xl border border-perceive-border bg-perceive-card p-4 shadow-sm sm:flex-row sm:items-center dark:border-gray-700 dark:bg-perceive-darkcard"
-                      >
-                        <div>
-                          <p className="text-sm text-perceive-muted">{item.fach?.name}</p>
-                          <p className="font-serif font-bold text-perceive-text dark:text-perceive-bg">
-                            {item.titel}
-                          </p>
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            <span
-                              className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                badge === 'Neu'
-                                  ? 'bg-perceive-accent/10 text-perceive-accent'
-                                  : 'bg-perceive-amber/10 text-perceive-amber'
-                              }`}
-                            >
-                              {badge}
-                            </span>
-                            {item.examCritical ? (
-                              <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                                Prüfung in {item.tageBisPruefung}{' '}
-                                {item.tageBisPruefung === 1 ? 'Tag' : 'Tagen'}!
-                              </span>
-                            ) : item.examUrgent ? (
-                              <span className="inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                                Prüfung bald
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <Link
-                          to={`/lernen/${item.id}`}
-                          className="rounded-lg bg-perceive-primary px-5 py-2.5 text-white transition hover:opacity-90"
-                        >
-                          Jetzt lernen →
-                        </Link>
+                  {/* Hero-Karte: der erste, wichtigste Block */}
+                  <div
+                    className="rounded-2xl border border-perceive-primary/20 p-6 shadow-sm"
+                    style={{ backgroundColor: 'rgba(61, 107, 142, 0.08)' }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-perceive-accent">
+                      Jetzt anfangen
+                    </p>
+                    <p className="mt-1 text-sm text-perceive-muted">{heroItem.fach?.name}</p>
+                    <p className="mt-1 font-serif text-lg font-bold text-perceive-text dark:text-perceive-bg">
+                      {heroItem.titel}
+                    </p>
+                    {renderBadges(heroItem)}
+                    <Link
+                      to={`/lernen/${heroItem.id}`}
+                      className="mt-4 inline-block rounded-lg bg-perceive-primary px-5 py-2.5 text-white transition hover:opacity-90"
+                    >
+                      Jetzt lernen →
+                    </Link>
+                  </div>
+
+                  {/* Weitere Blöcke: kompakter, mit Ghost-Button */}
+                  {restItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-col items-start justify-between gap-3 rounded-xl border border-perceive-border bg-perceive-card p-4 shadow-sm sm:flex-row sm:items-center dark:border-gray-700 dark:bg-perceive-darkcard"
+                    >
+                      <div>
+                        <p className="text-sm text-perceive-muted">{item.fach?.name}</p>
+                        <p className="font-serif font-bold text-perceive-text dark:text-perceive-bg">
+                          {item.titel}
+                        </p>
+                        {renderBadges(item)}
                       </div>
-                    )
-                  })}
+                      <Link
+                        to={`/lernen/${item.id}`}
+                        className="rounded-lg border border-perceive-primary px-5 py-2.5 text-perceive-primary transition hover:bg-perceive-primary/10"
+                      >
+                        Jetzt lernen →
+                      </Link>
+                    </div>
+                  ))}
                 </div>
               )}
+            </section>
+
+            <section className="mb-10">
+              <p className="mb-2 text-sm text-perceive-muted">Diese Woche noch</p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {wochenVorschau.map(({ datum, anzahl }, i) => {
+                  const istHeute = i === 0
+                  return (
+                    <div
+                      key={datum.toISOString()}
+                      className={`flex w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full py-2 ${
+                        istHeute
+                          ? 'bg-perceive-primary text-white'
+                          : anzahl > 0
+                            ? 'bg-perceive-primary/10 text-perceive-text dark:text-perceive-bg'
+                            : 'text-perceive-muted opacity-50'
+                      }`}
+                    >
+                      <span className={`text-xs ${istHeute ? 'text-white/80' : 'text-perceive-muted'}`}>
+                        {WOCHENTAGE_KURZ[datum.getDay()]}
+                      </span>
+                      <span className="font-serif font-bold">{anzahl > 0 ? anzahl : '–'}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </section>
 
             <section>
@@ -239,24 +352,28 @@ export default function Dashboard() {
                 </Link>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {faecher.map((fach) => {
-                  const blockIds = bloecke.filter((b) => b.fach_id === fach.id).map((b) => b.id)
+                  const fachBloecke = bloecke.filter((b) => b.fach_id === fach.id)
+                  const blockIds = fachBloecke.map((b) => b.id)
                   const total = blockIds.length
                   const beherrscht = blockIds.filter((id) => beherrschteBlockIds.has(id)).length
                   const prozent = total > 0 ? Math.round((beherrscht / total) * 100) : 0
                   const tage = tageBisPruefung(fach.pruefungsdatum)
+                  const heuteFaellig = fachBloecke.filter((block) =>
+                    istFaellig(fortschrittMap.get(block.id)?.naechste_wiederholung ?? null)
+                  ).length
 
                   return (
                     <div
                       key={fach.id}
                       className="rounded-xl border border-perceive-border bg-perceive-card p-5 shadow-sm transition hover:shadow-md dark:border-gray-700 dark:bg-perceive-darkcard"
                     >
-                      <h3 className="font-serif text-lg font-semibold text-perceive-text dark:text-perceive-bg">
+                      <h3 className="font-serif text-lg font-bold text-perceive-text dark:text-perceive-bg">
                         {fach.name}
                       </h3>
                       {tage !== null && (
-                        <p className="mt-1 text-sm text-perceive-muted">
+                        <p className={`mt-1 text-sm font-medium ${pruefungsdatumFarbe(tage)}`}>
                           {tage > 0
                             ? `noch ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`
                             : tage === 0
@@ -270,7 +387,7 @@ export default function Dashboard() {
                           style={{
                             background: '#E5E0D8',
                             borderRadius: 8,
-                            height: 8,
+                            height: 12,
                             overflow: 'hidden',
                           }}
                         >
@@ -279,7 +396,7 @@ export default function Dashboard() {
                               background: '#5BA08A',
                               width: `${prozent}%`,
                               borderRadius: 8,
-                              height: 8,
+                              height: 12,
                             }}
                           />
                         </div>
@@ -287,6 +404,10 @@ export default function Dashboard() {
                           {beherrscht} von {total} Blöcken beherrscht
                         </p>
                       </div>
+
+                      <p className="mt-3 text-sm text-perceive-text dark:text-perceive-bg">
+                        Heute fällig: {heuteFaellig} {heuteFaellig === 1 ? 'Block' : 'Blöcke'}
+                      </p>
 
                       <Link
                         to={`/fach/${fach.id}`}
