@@ -6,12 +6,14 @@ const OPTIONEN = [
 
 export default function EnergyCheckScreen({ onSelect }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-8 bg-perceive-bg px-6 dark:bg-perceive-darkbg">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-perceive-bg px-6 dark:bg-perceive-darkbg">
       <div className="text-center">
-        <h1 className="font-serif text-3xl font-semibold text-perceive-text dark:text-perceive-bg">
+        <h1 className="font-serif text-[24px] font-semibold text-[var(--heading)] sm:text-[32px]">
           Wie fühlst du dich heute?
         </h1>
-        <p className="mt-2 text-perceive-muted">Das bestimmt deinen Tagesplan.</p>
+        <p className="mb-12 mt-2 text-[15px] text-[var(--muted-2)]">
+          Das bestimmt deinen Tagesplan.
+        </p>
       </div>
 
       <div className="grid w-full max-w-2xl gap-4 sm:grid-cols-3">
@@ -20,13 +22,13 @@ export default function EnergyCheckScreen({ onSelect }) {
             key={option.level}
             type="button"
             onClick={() => onSelect(option.level)}
-            className="flex flex-col items-center gap-2 rounded-xl border border-perceive-border bg-perceive-card p-6 text-center shadow-sm transition-transform duration-150 ease-in-out hover:scale-[1.02] dark:border-gray-700 dark:bg-perceive-darkcard"
+            className="flex flex-col items-center gap-2 rounded-2xl border-[1.5px] border-[var(--card-border)] bg-perceive-card p-7 text-center transition-all duration-150 ease-in-out hover:scale-[1.02] hover:border-perceive-accent hover:bg-[var(--hero-bg)] dark:bg-perceive-darkcard"
           >
             <span className="text-4xl">{option.emoji}</span>
-            <span className="font-serif text-lg font-semibold text-perceive-text dark:text-perceive-bg">
+            <span className="font-serif text-lg font-bold text-[var(--heading)]">
               {option.label}
             </span>
-            <span className="text-xs text-perceive-muted">{option.text}</span>
+            <span className="text-[13px] text-[var(--muted-2)]">{option.text}</span>
           </button>
         ))}
       </div>

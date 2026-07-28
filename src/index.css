@@ -12,6 +12,21 @@
   --color-muted: #6B7280;
   --color-border: #E5E0D8;
 
+  /* Design-Tokens: Dashboard/Lern-Flow Redesign */
+  --heading: #1a2b3c;
+  --body-text: #374151;
+  --muted-2: #888888;
+  --card-border: #E8E4DC;
+  --hero-bg: #EEF3F7;
+  --kernaussage-bg: #F0F7F4;
+  --badge-neu-bg: #EEF3F7;
+  --badge-neu-border: #C5D8E8;
+  --badge-wiederholen-bg: #F0F7F4;
+  --badge-wiederholen-border: #B5D9CE;
+  --danger: #C0392B;
+  --disabled-bg: #D1D5DB;
+  --pill-inactive-text: #CCCCCC;
+
   color-scheme: light;
 }
 
@@ -24,6 +39,20 @@
   --color-text: #F3F4F6;
   --color-muted: #9CA3AF;
   --color-border: #374151;
+
+  --heading: #F3F4F6;
+  --body-text: #D1D5DB;
+  --muted-2: #9CA3AF;
+  --card-border: #374151;
+  --hero-bg: #1C2B3A;
+  --kernaussage-bg: rgba(123, 196, 169, 0.1);
+  --badge-neu-bg: rgba(91, 147, 190, 0.15);
+  --badge-neu-border: rgba(91, 147, 190, 0.4);
+  --badge-wiederholen-bg: rgba(123, 196, 169, 0.15);
+  --badge-wiederholen-border: rgba(123, 196, 169, 0.4);
+  --danger: #E57373;
+  --disabled-bg: #4B5563;
+  --pill-inactive-text: #6B7280;
 
   color-scheme: dark;
 }

@@ -155,51 +155,57 @@ export default function Lernen() {
 
   return (
     <div className="min-h-screen bg-perceive-bg dark:bg-perceive-darkbg">
-      <header className="mx-auto max-w-3xl px-6 py-6">
+      <header className="mx-auto max-w-[760px] px-4 py-6 sm:px-8">
         <Link
           to={`/fach/${block?.fach_id}`}
-          className="text-sm text-perceive-muted hover:text-perceive-primary"
+          className="text-sm text-[var(--muted-2)] hover:text-perceive-primary"
         >
           ← Zurück zum Fach
         </Link>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-4">
+      <main className="mx-auto max-w-[760px] px-4 py-4 sm:px-8">
         {phase === 'lesen' && (
           <div>
-            <p className="mb-2 text-sm tracking-wide text-perceive-muted">
+            <p
+              className="mb-2 text-[11px] text-[var(--muted-2)]"
+              style={{ letterSpacing: '0.1em' }}
+            >
               LIES DAS DURCH — DANN ERKLÄRE ES
             </p>
-            <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
+            <h1 className="font-serif text-[24px] font-semibold text-[var(--heading)] sm:text-[28px]">
               {block?.titel}
             </h1>
 
             {block?.kernaussage && (
               <div
                 style={{
-                  background: '#F0F7F4',
-                  borderLeft: '3px solid #5BA08A',
+                  background: 'var(--kernaussage-bg)',
+                  borderLeft: '3px solid var(--color-accent)',
                   borderRadius: 8,
-                  padding: '1rem',
+                  padding: '16px 20px',
                   marginTop: '1rem',
                   marginBottom: '1rem',
                 }}
               >
-                <p style={{ fontWeight: 600, color: '#5BA08A', marginBottom: '0.5rem' }}>
+                <p style={{ fontWeight: 600, color: 'var(--color-accent)', marginBottom: '0.5rem' }}>
                   Das Wichtigste:
                 </p>
-                <p className="text-perceive-text dark:text-perceive-bg">{block?.kernaussage}</p>
+                <p className="text-[var(--heading)]">{block?.kernaussage}</p>
               </div>
             )}
 
-            <p className="whitespace-pre-wrap text-perceive-text dark:text-perceive-bg">
+            <p
+              className="whitespace-pre-wrap text-[16px] text-[var(--body-text)]"
+              style={{ lineHeight: 1.7 }}
+            >
               {block?.inhalt}
             </p>
 
             <button
               type="button"
               onClick={() => setPhase('recall')}
-              className="mt-6 rounded-lg bg-perceive-primary px-5 py-3 text-white transition hover:opacity-90"
+              className="mt-6 w-full rounded-[10px] bg-perceive-primary px-7 py-3.5 text-white transition hover:opacity-90 sm:w-auto"
             >
               Ich habe es gelesen — jetzt testen ✓
             </button>
@@ -212,14 +218,12 @@ export default function Lernen() {
               {block?.titel}
             </h1>
 
-            <div className="mt-6 rounded-xl border border-perceive-border bg-perceive-card p-6 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
+            <div className="mt-6 rounded-xl border border-[var(--card-border)] bg-perceive-card p-6 dark:border-gray-700 dark:bg-perceive-darkcard">
               {!frageData ? (
-                <p className="text-perceive-muted">Per bereitet deine Frage vor…</p>
+                <p className="text-[var(--muted-2)]">Per bereitet deine Frage vor…</p>
               ) : (
                 <>
-                  <p className="font-medium text-perceive-text dark:text-perceive-bg">
-                    {frageData.frage}
-                  </p>
+                  <p className="font-serif text-[20px] text-[var(--heading)]">{frageData.frage}</p>
 
                   {zeigeHinweis && (
                     <p className="mt-3 text-sm text-perceive-amber">{block?.kernaussage}</p>
@@ -233,21 +237,27 @@ export default function Lernen() {
                       value={antwort}
                       onChange={(e) => setAntwort(e.target.value)}
                       disabled={phase === 'bewertet'}
-                      className="rounded-lg border border-perceive-border bg-transparent px-4 py-3 text-perceive-text outline-none focus:border-perceive-primary disabled:opacity-50 dark:text-perceive-bg"
+                      className="rounded-[10px] border-[1.5px] border-[var(--card-border)] bg-transparent p-4 text-[15px] text-[var(--heading)] outline-none focus:border-perceive-primary disabled:opacity-50"
                     />
 
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap items-center gap-4">
                       <button
                         type="button"
                         onClick={() => setZeigeHinweis(true)}
-                        className="rounded-lg border border-perceive-border px-4 py-2 text-sm text-perceive-muted transition hover:bg-perceive-bg dark:hover:bg-perceive-darkbg"
+                        className="text-[13px] text-[var(--muted-2)] underline-offset-2 transition hover:underline"
                       >
                         Ich komme nicht weiter
                       </button>
                       <button
                         type="submit"
                         disabled={!antwort.trim() || phase === 'bewertet'}
-                        className="ml-auto rounded-lg bg-perceive-primary px-5 py-2 text-white transition hover:opacity-90 disabled:opacity-40"
+                        className="ml-auto rounded-lg px-5 py-2 text-white transition hover:opacity-90"
+                        style={{
+                          backgroundColor:
+                            antwort.trim() && phase !== 'bewertet'
+                              ? 'var(--color-primary)'
+                              : 'var(--disabled-bg)',
+                        }}
                       >
                         {phase === 'bewertet' ? 'Per denkt nach…' : 'Antwort abschicken'}
                       </button>

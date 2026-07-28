@@ -10,10 +10,10 @@ const STATUS_LABEL = {
 }
 
 const STATUS_BADGE_CLASS = {
-  neu: 'bg-perceive-bg text-perceive-muted dark:bg-perceive-darkbg',
-  gelernt: 'bg-perceive-primary/10 text-perceive-primary',
-  wiederholen: 'bg-perceive-amber/10 text-perceive-amber',
-  beherrscht: 'bg-perceive-accent/10 text-perceive-accent',
+  neu: 'border-[var(--badge-neu-border)] bg-[var(--badge-neu-bg)] text-perceive-primary',
+  gelernt: 'border-perceive-primary/30 bg-perceive-primary/10 text-perceive-primary',
+  wiederholen: 'border-perceive-amber/30 bg-perceive-amber/10 text-perceive-amber',
+  beherrscht: 'border-[var(--badge-wiederholen-border)] bg-[var(--badge-wiederholen-bg)] text-perceive-accent',
 }
 
 function SchwierigkeitDots({ level }) {
@@ -80,36 +80,36 @@ export default function FachDetail() {
 
   return (
     <div className="min-h-screen bg-perceive-bg dark:bg-perceive-darkbg">
-      <header className="mx-auto max-w-3xl px-6 py-6">
-        <Link to="/dashboard" className="text-sm text-perceive-muted hover:text-perceive-primary">
+      <header className="mx-auto max-w-[760px] px-4 py-6 sm:px-8">
+        <Link to="/dashboard" className="text-sm text-[var(--muted-2)] hover:text-perceive-primary">
           ← Zurück zum Dashboard
         </Link>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-4">
-        <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
+      <main className="mx-auto max-w-[760px] px-4 py-4 sm:px-8">
+        <h1 className="font-serif text-[22px] font-semibold text-[var(--heading)]">
           {fach?.name}
         </h1>
         {fach?.pruefungsdatum && (
-          <p className="mt-1 text-perceive-muted">
+          <p className="mt-1 text-[var(--muted-2)]">
             Prüfung am {new Date(fach.pruefungsdatum).toLocaleDateString('de-DE')}
           </p>
         )}
 
         <div className="mt-4">
           <div
-            style={{ background: '#E5E0D8', borderRadius: 8, height: 8, overflow: 'hidden' }}
+            style={{ background: 'var(--card-border)', borderRadius: 8, height: 6, overflow: 'hidden' }}
           >
             <div
               style={{
-                background: '#5BA08A',
+                background: 'var(--color-accent)',
                 width: `${prozent}%`,
                 borderRadius: 8,
-                height: 8,
+                height: 6,
               }}
             />
           </div>
-          <p className="mt-1 text-sm text-perceive-muted">
+          <p className="mt-1 text-[12px] text-[var(--muted-2)]">
             {beherrscht} von {total} Blöcken beherrscht
           </p>
         </div>
@@ -120,14 +120,14 @@ export default function FachDetail() {
             return (
               <div
                 key={block.id}
-                className="rounded-xl border border-perceive-border bg-perceive-card p-5 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard"
+                className="rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 transition-colors duration-150 hover:border-perceive-accent dark:bg-perceive-darkcard"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-serif text-lg font-semibold text-perceive-text dark:text-perceive-bg">
+                  <h2 className="text-[15px] font-semibold text-[var(--heading)]">
                     {block.titel}
                   </h2>
                   <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${STATUS_BADGE_CLASS[status]}`}
+                    className={`shrink-0 rounded-[4px] border px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE_CLASS[status]}`}
                   >
                     {STATUS_LABEL[status]}
                   </span>
@@ -136,14 +136,14 @@ export default function FachDetail() {
                 {block.kernaussage && (
                   <div
                     style={{
-                      background: '#F0F7F4',
-                      borderLeft: '3px solid #5BA08A',
+                      background: 'var(--kernaussage-bg)',
+                      borderLeft: '3px solid var(--color-accent)',
                       borderRadius: 8,
-                      padding: '1rem',
+                      padding: '16px 20px',
                       marginTop: '0.75rem',
                     }}
                   >
-                    <p style={{ color: '#5BA08A', fontWeight: 600 }}>
+                    <p style={{ color: 'var(--color-accent)', fontWeight: 600 }}>
                       Das Wichtigste: {block.kernaussage}
                     </p>
                   </div>
