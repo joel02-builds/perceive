@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react'
+
 function SonneIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -37,19 +39,32 @@ function LernenIcon() {
 }
 
 const TABS = [
-  { key: 'heute', label: 'Heute', Icon: SonneIcon },
-  { key: 'woche', label: 'Woche', Icon: WocheIcon },
-  { key: 'faecher', label: 'Fächer', Icon: FaecherIcon },
-  { key: 'lernen', label: 'Lernen', Icon: LernenIcon },
+  { key: 'heute', label: 'Heute', tooltip: 'Heute', Icon: SonneIcon },
+  { key: 'woche', label: 'Woche', tooltip: 'Diese Woche', Icon: WocheIcon },
+  { key: 'faecher', label: 'Fächer', tooltip: 'Fächer', Icon: FaecherIcon },
+  { key: 'lernen', label: 'Lernen', tooltip: 'Lernen', Icon: LernenIcon },
 ]
 
 export default function BottomTabBar({ activeTab, onTabChange, onLernenClick }) {
+  const [hoveredTab, setHoveredTab] = useState(null)
+  const hoverTimeout = useRef(null)
+
   function handleClick(key) {
     if (key === 'lernen') {
       onLernenClick()
       return
     }
     onTabChange(key)
+  }
+
+  function handleMouseEnter(key) {
+    clearTimeout(hoverTimeout.current)
+    hoverTimeout.current = setTimeout(() => setHoveredTab(key), 200)
+  }
+
+  function handleMouseLeave() {
+    clearTimeout(hoverTimeout.current)
+    setHoveredTab(null)
   }
 
   return (
@@ -82,7 +97,7 @@ export default function BottomTabBar({ activeTab, onTabChange, onLernenClick }) 
               <span className="h-5 w-5">
                 <Icon />
               </span>
-              <span className="text-[11px]">{label}</span>
+              <span className="text-[10px]">{label}</span>
             </button>
           )
         })}
@@ -93,25 +108,40 @@ export default function BottomTabBar({ activeTab, onTabChange, onLernenClick }) 
         className="fixed inset-y-0 left-0 z-40 hidden w-16 flex-col items-center justify-center gap-6 bg-white md:flex dark:bg-perceive-darkcard"
         style={{ borderRight: '1px solid var(--card-border)' }}
       >
-        {TABS.map(({ key, label, Icon }) => {
+        {TABS.map(({ key, label, tooltip, Icon }) => {
           const aktiv = activeTab === key
           return (
-            <button
+            <div
               key={key}
-              type="button"
-              onClick={() => handleClick(key)}
-              title={label}
-              aria-label={label}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg transition"
-              style={{
-                color: aktiv ? 'var(--color-primary)' : '#9CA3AF',
-                backgroundColor: aktiv ? 'var(--hero-bg)' : 'transparent',
-              }}
+              className="relative"
+              onMouseEnter={() => handleMouseEnter(key)}
+              onMouseLeave={handleMouseLeave}
             >
-              <span className="h-5 w-5">
-                <Icon />
+              <button
+                type="button"
+                onClick={() => handleClick(key)}
+                aria-label={label}
+                className="relative flex h-9 w-9 items-center justify-center rounded-lg transition"
+                style={{
+                  color: aktiv ? 'var(--color-primary)' : '#9CA3AF',
+                  backgroundColor: aktiv ? 'var(--hero-bg)' : 'transparent',
+                }}
+              >
+                <span className="h-5 w-5">
+                  <Icon />
+                </span>
+              </button>
+              <span
+                className="pointer-events-none absolute top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md px-2.5 py-1 text-xs text-white transition-opacity duration-150"
+                style={{
+                  left: 72,
+                  backgroundColor: '#1a2b3c',
+                  opacity: hoveredTab === key ? 1 : 0,
+                }}
+              >
+                {tooltip}
               </span>
-            </button>
+            </div>
           )
         })}
       </nav>

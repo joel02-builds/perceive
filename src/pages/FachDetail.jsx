@@ -187,24 +187,47 @@ export default function FachDetail() {
         <div className="mt-8 flex flex-col gap-4">
           {sortierteBloecke.map((block) => {
             const status = fortschritt[block.id]?.status ?? 'neu'
+            const versuche = fortschritt[block.id]?.versuche ?? 0
+            const istBeherrscht = status === 'beherrscht' || versuche >= 3
+            const streifenFarbe = istBeherrscht
+              ? '#5BA08A'
+              : status === 'wiederholen'
+                ? '#E8A838'
+                : fachFarbe
+
             return (
               <div
                 key={block.id}
                 className="rounded-xl bg-perceive-card p-5 transition-colors duration-150 dark:bg-perceive-darkcard"
                 style={{
                   border: '1px solid var(--card-border)',
-                  borderLeft: `3px solid ${fachFarbe}`,
+                  borderLeft: `3px solid ${streifenFarbe}`,
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-[15px] font-semibold text-[var(--heading)]">
+                  <h2
+                    className="text-[15px] font-semibold"
+                    style={{
+                      color: istBeherrscht ? '#9CA3AF' : 'var(--heading)',
+                      textDecoration: istBeherrscht ? 'line-through' : 'none',
+                    }}
+                  >
                     {block.titel}
                   </h2>
-                  <span
-                    className={`shrink-0 rounded-[4px] border px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE_CLASS[status]}`}
-                  >
-                    {STATUS_LABEL[status]}
-                  </span>
+                  {istBeherrscht ? (
+                    <span
+                      className="shrink-0 rounded-[4px] border px-2 py-0.5 text-[11px] font-medium"
+                      style={{ background: '#F0F7F4', color: '#5BA08A', borderColor: '#B5D9CE' }}
+                    >
+                      ✓ Beherrscht
+                    </span>
+                  ) : (
+                    <span
+                      className={`shrink-0 rounded-[4px] border px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE_CLASS[status]}`}
+                    >
+                      {STATUS_LABEL[status]}
+                    </span>
+                  )}
                 </div>
 
                 {block.kernaussage && (
@@ -225,12 +248,22 @@ export default function FachDetail() {
 
                 <div className="mt-3 flex items-center justify-between">
                   <SchwierigkeitDots level={block.schwierigkeit ?? 3} />
-                  <Link
-                    to={`/lernen/${block.id}`}
-                    className="rounded-lg bg-perceive-primary px-4 py-2 text-sm text-white transition hover:opacity-90"
-                  >
-                    Jetzt lernen →
-                  </Link>
+                  {istBeherrscht ? (
+                    <Link
+                      to={`/lernen/${block.id}`}
+                      className="rounded-lg border px-4 py-2 text-sm transition"
+                      style={{ borderColor: '#9CA3AF', color: '#9CA3AF' }}
+                    >
+                      Nochmal lernen
+                    </Link>
+                  ) : (
+                    <Link
+                      to={`/lernen/${block.id}`}
+                      className="rounded-lg bg-perceive-primary px-4 py-2 text-sm text-white transition hover:opacity-90"
+                    >
+                      Jetzt lernen →
+                    </Link>
+                  )}
                 </div>
               </div>
             )
