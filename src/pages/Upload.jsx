@@ -92,6 +92,7 @@ export default function Upload() {
   const [pruefungsdatum, setPruefungsdatum] = useState('')
   const [lerntage, setLerntage] = useState([])
   const [tageszeit, setTageszeit] = useState('')
+  const [modus, setModus] = useState('unterlagen') // 'unterlagen' | 'themenvorgabe'
   const [file, setFile] = useState(null)
   const [dragActive, setDragActive] = useState(false)
 
@@ -146,7 +147,7 @@ export default function Upload() {
       const analyseRes = await fetch('/api/analyse-unterlagen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, fachName, pruefungsdatum, lerntage, tageszeit }),
+        body: JSON.stringify({ text, fachName, pruefungsdatum, lerntage, tageszeit, modus }),
       })
       const analyse = await analyseRes.json()
       if (!analyseRes.ok) throw new Error(analyse.error || 'Analyse fehlgeschlagen')
@@ -342,6 +343,46 @@ export default function Upload() {
             <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
               Lade deine Unterlagen hoch
             </h1>
+
+            <div>
+              <p className="mb-2 text-[12px] text-[var(--muted-2)]">Was lädst du hoch?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModus('unterlagen')}
+                  className="flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center transition"
+                  style={{
+                    borderColor: modus === 'unterlagen' ? 'var(--color-primary)' : 'var(--card-border)',
+                    backgroundColor: modus === 'unterlagen' ? 'var(--hero-bg)' : 'var(--color-card)',
+                  }}
+                >
+                  <span className="text-2xl">📄</span>
+                  <span className="text-sm font-medium text-perceive-text dark:text-perceive-bg">
+                    Eigene Unterlagen
+                  </span>
+                  <span className="text-xs text-[var(--muted-2)]">
+                    Zusammenfassungen, Skripte, Mitschriften
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModus('themenvorgabe')}
+                  className="flex flex-col items-center gap-1 rounded-lg border px-3 py-3 text-center transition"
+                  style={{
+                    borderColor: modus === 'themenvorgabe' ? 'var(--color-primary)' : 'var(--card-border)',
+                    backgroundColor: modus === 'themenvorgabe' ? 'var(--hero-bg)' : 'var(--color-card)',
+                  }}
+                >
+                  <span className="text-2xl">📋</span>
+                  <span className="text-sm font-medium text-perceive-text dark:text-perceive-bg">
+                    Offizielle Themenvorgabe
+                  </span>
+                  <span className="text-xs text-[var(--muted-2)]">
+                    Lehrplan, Abiturthemen, Inhaltsverzeichnis
+                  </span>
+                </button>
+              </div>
+            </div>
 
             <label
               onDragOver={(e) => {

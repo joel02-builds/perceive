@@ -190,7 +190,11 @@ export default function FachDetail() {
             return (
               <div
                 key={block.id}
-                className="rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 transition-colors duration-150 hover:border-perceive-accent dark:bg-perceive-darkcard"
+                className="rounded-xl bg-perceive-card p-5 transition-colors duration-150 dark:bg-perceive-darkcard"
+                style={{
+                  border: '1px solid var(--card-border)',
+                  borderLeft: `3px solid ${fachFarbe}`,
+                }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="text-[15px] font-semibold text-[var(--heading)]">

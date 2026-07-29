@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { istFaellig } from '../lib/spacedRepetition'
 import { buildTodaysPlan } from '../utils/buildTodaysPlan'
 import EnergyCheckScreen from '../components/EnergyCheckScreen'
+import BottomTabBar from '../components/BottomTabBar'
+import WochenAnsicht from '../components/WochenAnsicht'
+import FaecherUebersicht from '../components/FaecherUebersicht'
 
 const ENERGIE_STORAGE_KEY = 'perceive_energie_check'
 
@@ -13,8 +15,6 @@ const ENERGIE_PILL = {
   okay: { emoji: '😐', label: 'Geht so' },
   muede: { emoji: '😴', label: 'Müde' },
 }
-
-const WOCHENTAGE_KURZ = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 
 function heutigesDatum() {
   return new Date().toISOString().slice(0, 10)
@@ -32,49 +32,15 @@ function leseGespeicherteEnergie() {
   }
 }
 
-function tageBisPruefung(pruefungsdatum) {
-  if (!pruefungsdatum) return null
-  const heute = new Date()
-  heute.setHours(0, 0, 0, 0)
-  const pruefung = new Date(pruefungsdatum)
-  pruefung.setHours(0, 0, 0, 0)
-  return Math.ceil((pruefung - heute) / (1000 * 60 * 60 * 24))
-}
-
-// Dringlichkeit (< 6 Tage rot, 6-10 Tage amber) überschreibt die Fachfarbe
-function pruefungsdatumFarbe(tage, fachFarbe) {
-  if (tage === null) return 'var(--muted-2)'
-  if (tage < 6) return 'var(--danger)'
-  if (tage <= 10) return '#E8A838'
-  return fachFarbe || '#3D6B8E'
-}
-
-// Gruppiert alle Blöcke nach naechste_wiederholung für die nächsten 6 Tage.
-// Überfällige und neue (naechste_wiederholung = null) Blöcke zählen zu "heute".
-function berechneWochenVorschau(allBlocks) {
-  const heute = new Date()
-  heute.setHours(0, 0, 0, 0)
-
-  const tage = Array.from({ length: 6 }, (_, i) => {
-    const datum = new Date(heute)
-    datum.setDate(datum.getDate() + i)
-    return datum
+// Wählt den zeitlich nächsten Block über alle Fächer hinweg (überfällig/neu zuerst).
+function findeNaechstenBlock(allBlocks) {
+  if (allBlocks.length === 0) return null
+  const sortiert = [...allBlocks].sort((a, b) => {
+    const da = a.naechste_wiederholung ? new Date(a.naechste_wiederholung).getTime() : -Infinity
+    const db = b.naechste_wiederholung ? new Date(b.naechste_wiederholung).getTime() : -Infinity
+    return da - db
   })
-  const zaehler = tage.map(() => 0)
-
-  for (const block of allBlocks) {
-    const datum = block.naechste_wiederholung ? new Date(block.naechste_wiederholung) : heute
-    datum.setHours(0, 0, 0, 0)
-
-    if (datum <= heute) {
-      zaehler[0] += 1
-      continue
-    }
-    const diffTage = Math.round((datum - heute) / (1000 * 60 * 60 * 24))
-    if (diffTage < 6) zaehler[diffTage] += 1
-  }
-
-  return tage.map((datum, i) => ({ datum, anzahl: zaehler[i] }))
+  return sortiert[0]
 }
 
 function Badge({ farbe, children }) {
@@ -98,12 +64,15 @@ function Badge({ farbe, children }) {
 
 export default function Dashboard() {
   const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const [energyLevel, setEnergyLevel] = useState(() => leseGespeicherteEnergie())
   const [faecher, setFaecher] = useState([])
   const [bloecke, setBloecke] = useState([])
   const [fortschritt, setFortschritt] = useState([])
   const [loading, setLoading] = useState(true)
   const [avatarMenuOffen, setAvatarMenuOffen] = useState(false)
+  const [activeTab, setActiveTab] = useState('heute')
+  const [lernenFallbackAktiv, setLernenFallbackAktiv] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -167,8 +136,16 @@ export default function Dashboard() {
   const heutigeItems = buildTodaysPlan(allBlocksMitFortschritt, energyLevel)
   const [heroItem, ...restItems] = heutigeItems
   const energiePill = ENERGIE_PILL[energyLevel]
-  const wochenVorschau = berechneWochenVorschau(allBlocksMitFortschritt)
   const initiale = user?.email?.[0]?.toUpperCase() ?? '?'
+  const naechsterBlock = findeNaechstenBlock(allBlocksMitFortschritt)
+
+  function handleLernenClick() {
+    if (heutigeItems.length > 0) {
+      navigate(`/lernen/${heutigeItems[0].id}`)
+      return
+    }
+    setLernenFallbackAktiv(true)
+  }
 
   function renderBadges(item) {
     const istNeu = !fortschrittMap.has(item.id)
@@ -186,8 +163,10 @@ export default function Dashboard() {
     )
   }
 
+  const zeigeLeerenZustand = faecher.length === 0 && activeTab === 'heute'
+
   return (
-    <div className="min-h-screen bg-perceive-bg dark:bg-perceive-darkbg">
+    <div className="min-h-screen bg-perceive-bg dark:bg-perceive-darkbg md:pl-16">
       <header className="mx-auto flex max-w-[760px] items-center justify-between border-b border-[var(--card-border)] px-4 py-6 sm:px-8">
         <span className="font-serif text-xl font-bold text-[var(--heading)]">Perceive</span>
         <div className="relative">
@@ -222,8 +201,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[760px] px-4 py-8 sm:px-8">
-        {faecher.length === 0 ? (
+      <main className="mx-auto max-w-[760px] px-4 pb-24 pt-8 sm:px-8 md:pb-8">
+        {zeigeLeerenZustand ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <img
               src="/per.png"
@@ -246,269 +225,175 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            <section className="mb-8">
-              <div className="mb-4 flex items-center gap-3">
-                <h2 className="font-serif text-[22px] font-semibold text-[var(--heading)]">
-                  Heute
-                </h2>
-                <button
-                  type="button"
-                  onClick={handleEnergyReset}
-                  title="Energie-Check erneut öffnen"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--card-border)] bg-perceive-card px-3 py-1 text-sm text-[var(--heading)] transition hover:border-perceive-primary dark:border-gray-700 dark:bg-perceive-darkcard"
-                >
-                  <span>{energiePill.emoji}</span>
-                  <span>{energiePill.label}</span>
-                </button>
-              </div>
-
-              {!heroItem ? (
-                <div className="flex items-center gap-4 rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 dark:border-gray-700 dark:bg-perceive-darkcard">
-                  <img
-                    src="/per.png"
-                    alt="Per"
-                    style={{ width: 60, height: 60, objectFit: 'contain', mixBlendMode: 'multiply' }}
-                  />
-                  <p className="text-[var(--heading)]">Für heute bist du durch. Genieß die Pause.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {/* Hero-Karte: der erste, wichtigste Block */}
-                  <div
-                    className="rounded-xl p-6"
-                    style={{
-                      backgroundColor: 'var(--hero-bg)',
-                      borderLeft: '3px solid var(--color-accent)',
-                    }}
+            {activeTab === 'heute' && (
+              <section>
+                <div className="mb-4 flex items-center gap-3">
+                  <h2 className="font-serif text-[22px] font-semibold text-[var(--heading)]">
+                    Heute
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleEnergyReset}
+                    title="Energie-Check erneut öffnen"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--card-border)] bg-perceive-card px-3 py-1 text-sm text-[var(--heading)] transition hover:border-perceive-primary dark:border-gray-700 dark:bg-perceive-darkcard"
                   >
-                    <p
-                      className="text-[11px] font-medium text-perceive-accent"
-                      style={{ letterSpacing: '0.08em' }}
-                    >
-                      Jetzt anfangen
-                    </p>
-                    <p
-                      className="mt-1 text-[12px]"
-                      style={{ color: heroItem.fach?.farbe || 'var(--muted-2)' }}
-                    >
-                      {heroItem.fach?.name}
-                    </p>
-                    <p className="mt-1 font-serif text-[20px] font-semibold text-[var(--heading)]">
-                      {heroItem.titel}
-                    </p>
-                    {renderBadges(heroItem)}
-                    <Link
-                      to={`/lernen/${heroItem.id}`}
-                      className="mt-4 inline-block rounded-lg bg-perceive-primary px-5 py-2.5 text-white transition hover:opacity-90"
-                    >
-                      Jetzt lernen →
-                    </Link>
-                  </div>
+                    <span>{energiePill.emoji}</span>
+                    <span>{energiePill.label}</span>
+                  </button>
+                </div>
 
-                  {/* Weitere Blöcke: kompakter, mit Ghost-Button */}
-                  {restItems.map((item) => (
+                {!heroItem ? (
+                  <div className="flex items-center gap-4 rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 dark:border-gray-700 dark:bg-perceive-darkcard">
+                    <img
+                      src="/per.png"
+                      alt="Per"
+                      style={{ width: 60, height: 60, objectFit: 'contain', mixBlendMode: 'multiply' }}
+                    />
+                    <p className="text-[var(--heading)]">
+                      Für heute bist du durch. Genieß die Pause.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {/* Hero-Karte: der erste, wichtigste Block — Streifen bleibt grün (Signal, kein Fachbezug) */}
                     <div
-                      key={item.id}
-                      className="flex flex-col items-start justify-between gap-3 rounded-xl border border-[var(--card-border)] bg-perceive-card p-4 sm:flex-row sm:items-center dark:border-gray-700 dark:bg-perceive-darkcard"
+                      className="rounded-xl p-6"
+                      style={{
+                        backgroundColor: 'var(--hero-bg)',
+                        borderLeft: '3px solid var(--color-accent)',
+                      }}
                     >
-                      <div>
-                        <p
-                          className="text-[12px]"
-                          style={{ color: item.fach?.farbe || 'var(--muted-2)' }}
-                        >
-                          {item.fach?.name}
-                        </p>
-                        <p className="text-[15px] font-semibold text-[var(--heading)]">
-                          {item.titel}
-                        </p>
-                        {renderBadges(item)}
-                      </div>
+                      <p
+                        className="text-[11px] font-medium text-perceive-accent"
+                        style={{ letterSpacing: '0.08em' }}
+                      >
+                        Jetzt anfangen
+                      </p>
+                      <p
+                        className="mt-1 text-[12px]"
+                        style={{ color: heroItem.fach?.farbe || 'var(--muted-2)' }}
+                      >
+                        {heroItem.fach?.name}
+                      </p>
+                      <p className="mt-1 font-serif text-[20px] font-semibold text-[var(--heading)]">
+                        {heroItem.titel}
+                      </p>
+                      {renderBadges(heroItem)}
                       <Link
-                        to={`/lernen/${item.id}`}
-                        className="rounded-lg border border-perceive-primary px-5 py-2.5 text-perceive-primary transition hover:bg-perceive-primary/10"
+                        to={`/lernen/${heroItem.id}`}
+                        className="mt-4 inline-block rounded-lg bg-perceive-primary px-5 py-2.5 text-white transition hover:opacity-90"
                       >
                         Jetzt lernen →
                       </Link>
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
 
-            <section className="mb-10">
-              <p
-                className="mb-2 text-[12px] text-[var(--muted-2)]"
-                style={{ letterSpacing: '0.06em' }}
-              >
-                Diese Woche
-              </p>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {(() => {
-                  const [heute, ...andereTage] = wochenVorschau
-                  const andereTageMitBloecken = andereTage.some((t) => t.anzahl > 0)
-
-                  const heutePill = (
-                    <div
-                      key={heute.datum.toISOString()}
-                      className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl"
-                      style={{
-                        minWidth: 52,
-                        height: 60,
-                        backgroundColor: 'var(--color-primary)',
-                        color: '#FFFFFF',
-                      }}
-                    >
-                      <span className="text-[11px]" style={{ opacity: 0.7 }}>
-                        {WOCHENTAGE_KURZ[heute.datum.getDay()]}
-                      </span>
-                      <span className="font-serif text-[20px] font-bold">
-                        {heute.anzahl > 0 ? heute.anzahl : '–'}
-                      </span>
-                    </div>
-                  )
-
-                  if (!andereTageMitBloecken) {
-                    return (
-                      <>
-                        {heutePill}
-                        <p className="text-[12px] text-[var(--muted-2)]">
-                          Diese Woche nichts weiteres geplant
-                        </p>
-                      </>
-                    )
-                  }
-
-                  return (
-                    <>
-                      {heutePill}
-                      {andereTage.map(({ datum, anzahl }) =>
-                        anzahl > 0 ? (
-                          <div
-                            key={datum.toISOString()}
-                            className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl"
-                            style={{
-                              minWidth: 52,
-                              height: 60,
-                              backgroundColor: 'var(--hero-bg)',
-                              color: 'var(--color-primary)',
-                            }}
-                          >
-                            <span className="text-[11px]">{WOCHENTAGE_KURZ[datum.getDay()]}</span>
-                            <span className="font-serif text-[20px] font-bold">{anzahl}</span>
-                          </div>
-                        ) : (
-                          <div
-                            key={datum.toISOString()}
-                            className="flex shrink-0 flex-col items-center justify-center gap-0.5"
-                            style={{ opacity: 0.4, minWidth: 32 }}
-                          >
-                            <span className="text-[11px]" style={{ color: 'var(--pill-inactive-text)' }}>
-                              {WOCHENTAGE_KURZ[datum.getDay()]}
-                            </span>
-                            <span
-                              className="font-serif text-[14px]"
-                              style={{ color: 'var(--pill-inactive-text)' }}
-                            >
-                              –
-                            </span>
-                          </div>
-                        )
-                      )}
-                    </>
-                  )
-                })()}
-              </div>
-            </section>
-
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-serif text-[22px] font-semibold text-[var(--heading)]">
-                  Deine Fächer
-                </h2>
-                <Link
-                  to="/upload"
-                  className="rounded-lg bg-perceive-accent px-4 py-2 text-white transition hover:opacity-90"
-                >
-                  + Neues Fach
-                </Link>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {faecher.map((fach) => {
-                  const fachBloecke = bloecke.filter((b) => b.fach_id === fach.id)
-                  const blockIds = fachBloecke.map((b) => b.id)
-                  const total = blockIds.length
-                  const beherrscht = blockIds.filter((id) => beherrschteBlockIds.has(id)).length
-                  const prozent = total > 0 ? Math.round((beherrscht / total) * 100) : 0
-                  const tage = tageBisPruefung(fach.pruefungsdatum)
-                  const heuteGeplant = fachBloecke.filter((block) =>
-                    istFaellig(fortschrittMap.get(block.id)?.naechste_wiederholung ?? null)
-                  ).length
-                  const fachFarbe = fach.farbe || '#3D6B8E'
-
-                  return (
-                    <div
-                      key={fach.id}
-                      className="rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 transition-colors duration-150 hover:border-perceive-accent dark:bg-perceive-darkcard"
-                    >
-                      <h3 className="font-serif text-[18px] font-bold" style={{ color: fachFarbe }}>
-                        {fach.name}
-                      </h3>
-                      {tage !== null && (
-                        <p
-                          className="mt-1 text-[13px] font-medium"
-                          style={{ color: pruefungsdatumFarbe(tage, fachFarbe) }}
-                        >
-                          {tage > 0
-                            ? `noch ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`
-                            : tage === 0
-                              ? 'Prüfung ist heute'
-                              : 'Prüfung ist vorbei'}
-                        </p>
-                      )}
-
-                      <div className="mt-4">
-                        <div
-                          style={{
-                            background: 'var(--card-border)',
-                            borderRadius: 8,
-                            height: 6,
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: fachFarbe,
-                              width: `${prozent}%`,
-                              borderRadius: 8,
-                              height: 6,
-                            }}
-                          />
-                        </div>
-                        <p className="mt-1 text-[12px] text-[var(--muted-2)]">
-                          {beherrscht} von {total} Blöcken beherrscht
-                        </p>
-                      </div>
-
-                      <p className="mt-3 text-[13px] font-semibold" style={{ color: fachFarbe }}>
-                        {heuteGeplant} {heuteGeplant === 1 ? 'Block' : 'Blöcke'} heute geplant
-                      </p>
-
-                      <Link
-                        to={`/fach/${fach.id}`}
-                        className="mt-4 inline-block text-[13px] font-medium hover:underline"
-                        style={{ color: fachFarbe }}
+                    {/* Weitere Blöcke: kompakter, mit Ghost-Button + Fachfarben-Streifen */}
+                    {restItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-col items-start justify-between gap-3 rounded-xl bg-perceive-card p-4 sm:flex-row sm:items-center dark:bg-perceive-darkcard"
+                        style={{
+                          border: '1px solid var(--card-border)',
+                          borderLeft: `3px solid ${item.fach?.farbe || '#3D6B8E'}`,
+                        }}
                       >
-                        Zum Fach →
-                      </Link>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
+                        <div>
+                          <p
+                            className="text-[12px]"
+                            style={{ color: item.fach?.farbe || 'var(--muted-2)' }}
+                          >
+                            {item.fach?.name}
+                          </p>
+                          <p className="text-[15px] font-semibold text-[var(--heading)]">
+                            {item.titel}
+                          </p>
+                          {renderBadges(item)}
+                        </div>
+                        <Link
+                          to={`/lernen/${item.id}`}
+                          className="rounded-lg border border-perceive-primary px-5 py-2.5 text-perceive-primary transition hover:bg-perceive-primary/10"
+                        >
+                          Jetzt lernen →
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activeTab === 'woche' && (
+              <section>
+                <h2 className="mb-4 font-serif text-[22px] font-semibold text-[var(--heading)]">
+                  Diese Woche
+                </h2>
+                <WochenAnsicht
+                  allBlocks={allBlocksMitFortschritt}
+                  faecher={faecher}
+                  fortschrittMap={fortschrittMap}
+                />
+              </section>
+            )}
+
+            {activeTab === 'faecher' && (
+              <section>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="font-serif text-[22px] font-semibold text-[var(--heading)]">
+                    Deine Fächer
+                  </h2>
+                  <Link
+                    to="/upload"
+                    className="rounded-lg bg-perceive-accent px-4 py-2 text-white transition hover:opacity-90"
+                  >
+                    + Neues Fach
+                  </Link>
+                </div>
+                <FaecherUebersicht
+                  faecher={faecher}
+                  bloecke={bloecke}
+                  fortschrittMap={fortschrittMap}
+                  beherrschteBlockIds={beherrschteBlockIds}
+                />
+              </section>
+            )}
           </>
         )}
       </main>
+
+      <BottomTabBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onLernenClick={handleLernenClick}
+      />
+
+      {lernenFallbackAktiv && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-perceive-bg px-6 text-center dark:bg-perceive-darkbg">
+          <img
+            src="/per.png"
+            alt="Per"
+            style={{ width: 120, height: 120, objectFit: 'contain', mixBlendMode: 'multiply' }}
+          />
+          <p className="font-serif text-xl font-semibold text-[var(--heading)]">
+            Für heute bist du durch.
+          </p>
+          {naechsterBlock && (
+            <button
+              type="button"
+              onClick={() => navigate(`/lernen/${naechsterBlock.id}`)}
+              className="rounded-lg bg-perceive-primary px-5 py-2.5 text-white transition hover:opacity-90"
+            >
+              Trotzdem lernen → {naechsterBlock.titel}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setLernenFallbackAktiv(false)}
+            className="text-sm text-[var(--muted-2)] hover:underline"
+          >
+            Zurück
+          </button>
+        </div>
+      )}
     </div>
   )
 }

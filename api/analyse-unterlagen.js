@@ -8,8 +8,13 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { text, fachName, pruefungsdatum, lerntage } = req.body
+  const { text, fachName, pruefungsdatum, lerntage, modus } = req.body
   if (!text) return res.status(400).json({ error: 'Kein Text übergeben' })
+
+  const themenvorgabeHinweis =
+    modus === 'themenvorgabe'
+      ? '\n\nWICHTIG: Dieses Dokument ist eine offizielle Themenvorgabe oder ein Lehrplan, keine Lernunterlage. Extrahiere alle genannten Themen und Inhalte und erstelle daraus optimale Lernblöcke. Jeder Block soll ein abgrenzbares Thema abdecken. Formuliere für jeden Block eine prägnante Kernaussage die erklärt worum es geht. Der Inhalt-Text soll die wichtigsten Unterthemen und Konzepte auflisten die ein Schüler/Student zu diesem Block verstehen muss.'
+      : ''
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -46,7 +51,7 @@ Format:
 }
 
 Lernstoff:
-${text.substring(0, 10000)}`
+${text.substring(0, 10000)}${themenvorgabeHinweis}`
 
   try {
     const message = await client.messages.create({
