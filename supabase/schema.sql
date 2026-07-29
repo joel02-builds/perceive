@@ -11,6 +11,7 @@ create table public.faecher (
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   pruefungsdatum date,
+  farbe text default '#3D6B8E',
   created_at timestamptz default now()
 );
 

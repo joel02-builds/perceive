@@ -31,7 +31,7 @@ export default function Lernen() {
     async function init() {
       const { data: blockData, error: blockError } = await supabase
         .from('bloecke')
-        .select('*')
+        .select('*, fach:faecher(id, name, farbe)')
         .eq('id', blockId)
         .single()
 
@@ -173,6 +173,9 @@ export default function Lernen() {
             >
               LIES DAS DURCH — DANN ERKLÄRE ES
             </p>
+            <p className="text-[12px]" style={{ color: block?.fach?.farbe || 'var(--muted-2)' }}>
+              {block?.fach?.name}
+            </p>
             <h1 className="font-serif text-[24px] font-semibold text-[var(--heading)] sm:text-[28px]">
               {block?.titel}
             </h1>
@@ -214,6 +217,9 @@ export default function Lernen() {
 
         {(phase === 'recall' || phase === 'bewertet') && (
           <>
+            <p className="text-[12px]" style={{ color: block?.fach?.farbe || 'var(--muted-2)' }}>
+              {block?.fach?.name}
+            </p>
             <h1 className="font-serif text-2xl font-semibold text-perceive-text dark:text-perceive-bg">
               {block?.titel}
             </h1>

@@ -41,11 +41,12 @@ function tageBisPruefung(pruefungsdatum) {
   return Math.ceil((pruefung - heute) / (1000 * 60 * 60 * 24))
 }
 
-function pruefungsdatumFarbe(tage) {
-  if (tage === null) return 'text-[var(--muted-2)]'
-  if (tage < 6) return 'text-[var(--danger)]'
-  if (tage <= 10) return 'text-perceive-amber'
-  return 'text-[var(--muted-2)]'
+// Dringlichkeit (< 6 Tage rot, 6-10 Tage amber) überschreibt die Fachfarbe
+function pruefungsdatumFarbe(tage, fachFarbe) {
+  if (tage === null) return 'var(--muted-2)'
+  if (tage < 6) return 'var(--danger)'
+  if (tage <= 10) return '#E8A838'
+  return fachFarbe || '#3D6B8E'
 }
 
 // Gruppiert alle Blöcke nach naechste_wiederholung für die nächsten 6 Tage.
@@ -117,7 +118,7 @@ export default function Dashboard() {
         fachIds.length
           ? supabase
               .from('bloecke')
-              .select('*, fach:faecher(id, name, pruefungsdatum)')
+              .select('*, fach:faecher(id, name, pruefungsdatum, farbe)')
               .in('fach_id', fachIds)
           : Promise.resolve({ data: [] }),
         supabase.from('fortschritt').select('*'),
@@ -286,7 +287,12 @@ export default function Dashboard() {
                     >
                       Jetzt anfangen
                     </p>
-                    <p className="mt-1 text-[12px] text-[var(--muted-2)]">{heroItem.fach?.name}</p>
+                    <p
+                      className="mt-1 text-[12px]"
+                      style={{ color: heroItem.fach?.farbe || 'var(--muted-2)' }}
+                    >
+                      {heroItem.fach?.name}
+                    </p>
                     <p className="mt-1 font-serif text-[20px] font-semibold text-[var(--heading)]">
                       {heroItem.titel}
                     </p>
@@ -306,7 +312,12 @@ export default function Dashboard() {
                       className="flex flex-col items-start justify-between gap-3 rounded-xl border border-[var(--card-border)] bg-perceive-card p-4 sm:flex-row sm:items-center dark:border-gray-700 dark:bg-perceive-darkcard"
                     >
                       <div>
-                        <p className="text-[12px] text-[var(--muted-2)]">{item.fach?.name}</p>
+                        <p
+                          className="text-[12px]"
+                          style={{ color: item.fach?.farbe || 'var(--muted-2)' }}
+                        >
+                          {item.fach?.name}
+                        </p>
                         <p className="text-[15px] font-semibold text-[var(--heading)]">
                           {item.titel}
                         </p>
@@ -331,40 +342,81 @@ export default function Dashboard() {
               >
                 Diese Woche
               </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {wochenVorschau.map(({ datum, anzahl }, i) => {
-                  const istHeute = i === 0
-                  return (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {(() => {
+                  const [heute, ...andereTage] = wochenVorschau
+                  const andereTageMitBloecken = andereTage.some((t) => t.anzahl > 0)
+
+                  const heutePill = (
                     <div
-                      key={datum.toISOString()}
+                      key={heute.datum.toISOString()}
                       className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl"
                       style={{
                         minWidth: 52,
                         height: 60,
-                        backgroundColor: istHeute
-                          ? 'var(--color-primary)'
-                          : anzahl > 0
-                            ? 'var(--hero-bg)'
-                            : 'transparent',
-                        color: istHeute
-                          ? '#FFFFFF'
-                          : anzahl > 0
-                            ? 'var(--color-primary)'
-                            : 'var(--pill-inactive-text)',
+                        backgroundColor: 'var(--color-primary)',
+                        color: '#FFFFFF',
                       }}
                     >
-                      <span
-                        className="text-[11px]"
-                        style={{ opacity: istHeute ? 0.7 : 1 }}
-                      >
-                        {WOCHENTAGE_KURZ[datum.getDay()]}
+                      <span className="text-[11px]" style={{ opacity: 0.7 }}>
+                        {WOCHENTAGE_KURZ[heute.datum.getDay()]}
                       </span>
                       <span className="font-serif text-[20px] font-bold">
-                        {anzahl > 0 ? anzahl : '–'}
+                        {heute.anzahl > 0 ? heute.anzahl : '–'}
                       </span>
                     </div>
                   )
-                })}
+
+                  if (!andereTageMitBloecken) {
+                    return (
+                      <>
+                        {heutePill}
+                        <p className="text-[12px] text-[var(--muted-2)]">
+                          Diese Woche nichts weiteres geplant
+                        </p>
+                      </>
+                    )
+                  }
+
+                  return (
+                    <>
+                      {heutePill}
+                      {andereTage.map(({ datum, anzahl }) =>
+                        anzahl > 0 ? (
+                          <div
+                            key={datum.toISOString()}
+                            className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-xl"
+                            style={{
+                              minWidth: 52,
+                              height: 60,
+                              backgroundColor: 'var(--hero-bg)',
+                              color: 'var(--color-primary)',
+                            }}
+                          >
+                            <span className="text-[11px]">{WOCHENTAGE_KURZ[datum.getDay()]}</span>
+                            <span className="font-serif text-[20px] font-bold">{anzahl}</span>
+                          </div>
+                        ) : (
+                          <div
+                            key={datum.toISOString()}
+                            className="flex shrink-0 flex-col items-center justify-center gap-0.5"
+                            style={{ opacity: 0.4, minWidth: 32 }}
+                          >
+                            <span className="text-[11px]" style={{ color: 'var(--pill-inactive-text)' }}>
+                              {WOCHENTAGE_KURZ[datum.getDay()]}
+                            </span>
+                            <span
+                              className="font-serif text-[14px]"
+                              style={{ color: 'var(--pill-inactive-text)' }}
+                            >
+                              –
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </section>
 
@@ -392,17 +444,21 @@ export default function Dashboard() {
                   const heuteGeplant = fachBloecke.filter((block) =>
                     istFaellig(fortschrittMap.get(block.id)?.naechste_wiederholung ?? null)
                   ).length
+                  const fachFarbe = fach.farbe || '#3D6B8E'
 
                   return (
                     <div
                       key={fach.id}
                       className="rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 transition-colors duration-150 hover:border-perceive-accent dark:bg-perceive-darkcard"
                     >
-                      <h3 className="font-serif text-[18px] font-bold text-[var(--heading)]">
+                      <h3 className="font-serif text-[18px] font-bold" style={{ color: fachFarbe }}>
                         {fach.name}
                       </h3>
                       {tage !== null && (
-                        <p className={`mt-1 text-[13px] font-medium ${pruefungsdatumFarbe(tage)}`}>
+                        <p
+                          className="mt-1 text-[13px] font-medium"
+                          style={{ color: pruefungsdatumFarbe(tage, fachFarbe) }}
+                        >
                           {tage > 0
                             ? `noch ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`
                             : tage === 0
@@ -422,7 +478,7 @@ export default function Dashboard() {
                         >
                           <div
                             style={{
-                              background: 'var(--color-accent)',
+                              background: fachFarbe,
                               width: `${prozent}%`,
                               borderRadius: 8,
                               height: 6,
@@ -434,13 +490,14 @@ export default function Dashboard() {
                         </p>
                       </div>
 
-                      <p className="mt-3 text-[13px] font-semibold text-perceive-primary">
+                      <p className="mt-3 text-[13px] font-semibold" style={{ color: fachFarbe }}>
                         {heuteGeplant} {heuteGeplant === 1 ? 'Block' : 'Blöcke'} heute geplant
                       </p>
 
                       <Link
                         to={`/fach/${fach.id}`}
-                        className="mt-4 inline-block text-[13px] font-medium text-perceive-accent hover:underline"
+                        className="mt-4 inline-block text-[13px] font-medium hover:underline"
+                        style={{ color: fachFarbe }}
                       >
                         Zum Fach →
                       </Link>
