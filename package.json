@@ -14,6 +14,7 @@
     "@supabase/supabase-js": "^2.110.9",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
+    "mammoth": "^1.12.0",
     "pdfjs-dist": "^6.1.200",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
