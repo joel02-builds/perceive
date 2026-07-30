@@ -106,6 +106,24 @@ function BlockKarteKompakt({ block, istNeu }) {
 
 export default function WochenAnsicht({ allBlocks, faecher, fortschrittMap }) {
   const woche = berechneWoche(allBlocks, faecher)
+  const wocheKomplettLeer = woche.every(
+    ({ bloecke, pruefungen }) => bloecke.length === 0 && pruefungen.length === 0
+  )
+
+  if (wocheKomplettLeer) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-16 text-center">
+        <img
+          src="/per.png"
+          alt="Per"
+          style={{ width: 64, height: 64, objectFit: 'contain', mixBlendMode: 'multiply' }}
+        />
+        <p className="max-w-xs text-[var(--heading)]">
+          Diese Woche hast du alles im Griff. Genieß die freie Zeit.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">

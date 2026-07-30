@@ -2,9 +2,38 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { buildTodaysPlan } from '../utils/buildTodaysPlan'
+import { inkrementiereBlockZaehler } from '../lib/sessionStats'
+import BlockAbschluss from '../components/BlockAbschluss'
+
+const ENERGIE_STORAGE_KEY = 'perceive_energie_check'
 
 function toDateStr(date) {
   return date.toISOString().slice(0, 10)
+}
+
+function leseEnergyLevel() {
+  try {
+    const raw = localStorage.getItem(ENERGIE_STORAGE_KEY)
+    if (!raw) return 'okay'
+    const parsed = JSON.parse(raw)
+    if (parsed.date !== toDateStr(new Date())) return 'okay'
+    return parsed.level ?? 'okay'
+  } catch {
+    return 'okay'
+  }
+}
+
+// Wählt den zeitlich nächsten Block über alle Fächer hinweg (überfällig/neu zuerst) —
+// gleiches Fallback-Prinzip wie Dashboard.jsx, aber lokal, um Lernen.jsx unabhängig zu halten.
+function findeNaechstenBlock(allBlocks) {
+  if (allBlocks.length === 0) return null
+  const sortiert = [...allBlocks].sort((a, b) => {
+    const da = a.naechste_wiederholung ? new Date(a.naechste_wiederholung).getTime() : -Infinity
+    const db = b.naechste_wiederholung ? new Date(b.naechste_wiederholung).getTime() : -Infinity
+    return da - db
+  })
+  return sortiert[0]
 }
 
 const STATUS_LABEL = {
@@ -24,8 +53,9 @@ export default function Lernen() {
   const [antwort, setAntwort] = useState('')
   const [zeigeHinweis, setZeigeHinweis] = useState(false)
   const [ergebnis, setErgebnis] = useState(null)
-  const [phase, setPhase] = useState('laedt') // 'laedt' | 'lesen' | 'recall' | 'bewertet' | 'feedback' | 'error'
+  const [phase, setPhase] = useState('laedt') // 'laedt' | 'lesen' | 'recall' | 'bewertet' | 'feedback' | 'abschluss' | 'error'
   const [error, setError] = useState(null)
+  const [naechsterBlockKandidat, setNaechsterBlockKandidat] = useState(undefined)
 
   useEffect(() => {
     async function init() {
@@ -87,6 +117,48 @@ export default function Lernen() {
     }
   }, [phase, frageData, block])
 
+  // Lädt im Hintergrund einen Kandidaten für "Nächsten Block lernen" auf dem
+  // Abschluss-Screen — bewusst dieselbe Logik (buildTodaysPlan) wie Dashboard.jsx,
+  // damit die Auswahl konsistent bleibt. Läuft schon während des Feedback-Screens,
+  // damit beim Wechsel zu BlockAbschluss kein Ladezustand nötig ist.
+  useEffect(() => {
+    if (phase !== 'feedback' || naechsterBlockKandidat !== undefined) return
+
+    let cancelled = false
+    async function ladeNaechstenBlock() {
+      const { data: faecherData } = await supabase.from('faecher').select('id, pruefungsdatum')
+      const fachIds = (faecherData ?? []).map((f) => f.id)
+
+      const [{ data: bloeckeData }, { data: fortschrittData }] = await Promise.all([
+        fachIds.length
+          ? supabase
+              .from('bloecke')
+              .select('*, fach:faecher(id, name, pruefungsdatum, farbe)')
+              .in('fach_id', fachIds)
+          : Promise.resolve({ data: [] }),
+        supabase.from('fortschritt').select('*').eq('user_id', user.id),
+      ])
+
+      const fortschrittMap = new Map((fortschrittData ?? []).map((f) => [f.block_id, f]))
+      const kandidaten = (bloeckeData ?? [])
+        .filter((b) => b.id !== blockId)
+        .map((b) => ({
+          ...b,
+          naechste_wiederholung: fortschrittMap.get(b.id)?.naechste_wiederholung ?? null,
+        }))
+
+      const geplant = buildTodaysPlan(kandidaten, leseEnergyLevel())
+      const kandidat = geplant[0] ?? findeNaechstenBlock(kandidaten)
+
+      if (!cancelled) setNaechsterBlockKandidat(kandidat)
+    }
+    ladeNaechstenBlock()
+
+    return () => {
+      cancelled = true
+    }
+  }, [phase, blockId, user, naechsterBlockKandidat])
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!antwort.trim()) return
@@ -127,6 +199,7 @@ export default function Lernen() {
         .eq('block_id', blockId)
         .eq('datum', toDateStr(new Date()))
 
+      inkrementiereBlockZaehler()
       setPhase('feedback')
     } catch (err) {
       setError(err.message)
@@ -278,19 +351,6 @@ export default function Lernen() {
         {phase === 'feedback' && ergebnis && (
           <div className="mt-6 flex flex-col gap-4">
             <div className="rounded-xl border border-perceive-border bg-perceive-card p-6 shadow-sm dark:border-gray-700 dark:bg-perceive-darkcard">
-              {ergebnis.status === 'beherrscht' && (
-                <div style={{ textAlign: 'center', padding: '1rem 0' }}>
-                  <img
-                    src="/per.png"
-                    alt="Per"
-                    style={{ width: 60, height: 60, objectFit: 'contain', mixBlendMode: 'multiply' }}
-                  />
-                  <p style={{ fontFamily: 'Fraunces, serif', color: '#3D6B8E' }}>
-                    Sehr gut. Dieser Block sitzt. ⚡
-                  </p>
-                </div>
-              )}
-
               <span className="inline-block rounded-full bg-perceive-accent/10 px-3 py-1 text-sm font-medium text-perceive-accent">
                 {STATUS_LABEL[ergebnis.status] ?? ergebnis.status}
               </span>
@@ -302,12 +362,33 @@ export default function Lernen() {
 
             <button
               type="button"
-              onClick={() => navigate(`/fach/${block.fach_id}`)}
+              onClick={() => setPhase('abschluss')}
               className="rounded-lg bg-perceive-primary px-4 py-3 text-white transition hover:opacity-90"
             >
-              Weiter zum nächsten Block
+              Weiter
             </button>
           </div>
+        )}
+
+        {phase === 'abschluss' && ergebnis && (
+          <BlockAbschluss
+            bewertung={ergebnis.status}
+            blockTitel={block?.titel}
+            fachName={block?.fach?.name}
+            naechsteWiederholung={ergebnis.naechste_wiederholung}
+            onWeiter={() =>
+              navigate('/dashboard', {
+                state: { zeigeSessionToast: true },
+              })
+            }
+            onNaechsterBlock={() => {
+              if (naechsterBlockKandidat) {
+                navigate(`/lernen/${naechsterBlockKandidat.id}`)
+              } else {
+                navigate('/dashboard', { state: { zeigeSessionToast: true } })
+              }
+            }}
+          />
         )}
       </main>
     </div>

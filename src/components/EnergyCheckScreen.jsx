@@ -8,6 +8,12 @@ export default function EnergyCheckScreen({ onSelect }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-perceive-bg px-6 dark:bg-perceive-darkbg">
       <div className="text-center">
+        <img
+          src="/per.png"
+          alt="Per"
+          className="mx-auto mb-4"
+          style={{ width: 48, height: 48, objectFit: 'contain', mixBlendMode: 'multiply' }}
+        />
         <h1 className="font-serif text-[24px] font-semibold text-[var(--heading)] sm:text-[32px]">
           Wie fühlst du dich heute?
         </h1>

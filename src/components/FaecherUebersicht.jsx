@@ -19,6 +19,27 @@ function pruefungsdatumFarbe(tage, fachFarbe) {
 }
 
 export default function FaecherUebersicht({ faecher, bloecke, fortschrittMap, beherrschteBlockIds }) {
+  if (faecher.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-16 text-center">
+        <img
+          src="/per.png"
+          alt="Per"
+          style={{ width: 64, height: 64, objectFit: 'contain', mixBlendMode: 'multiply' }}
+        />
+        <p className="max-w-xs text-[var(--heading)]">
+          Noch keine Fächer. Füge dein erstes Fach hinzu und ich helfe dir beim Lernen.
+        </p>
+        <Link
+          to="/upload"
+          className="mt-2 rounded-lg bg-perceive-accent px-5 py-2.5 text-white transition hover:opacity-90"
+        >
+          + Neues Fach
+        </Link>
+      </div>
+    )
+  }
+
   const heute = new Date()
   heute.setHours(0, 0, 0, 0)
   const inSiebenTagen = new Date(heute)
@@ -107,10 +128,6 @@ export default function FaecherUebersicht({ faecher, bloecke, fortschrittMap, be
           </Link>
         )
       })}
-
-      {faecher.length === 0 && (
-        <p className="text-[var(--muted-2)]">Noch keine Fächer angelegt.</p>
-      )}
     </div>
   )
 }

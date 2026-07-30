@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { buildTodaysPlan } from '../utils/buildTodaysPlan'
@@ -7,6 +7,8 @@ import EnergyCheckScreen from '../components/EnergyCheckScreen'
 import BottomTabBar from '../components/BottomTabBar'
 import WochenAnsicht from '../components/WochenAnsicht'
 import FaecherUebersicht from '../components/FaecherUebersicht'
+import SessionToast from '../components/SessionToast'
+import { leseBlockZaehlerHeute, pruefeUndAktualisiereLetztenLogin } from '../lib/sessionStats'
 
 const ENERGIE_STORAGE_KEY = 'perceive_energie_check'
 
@@ -65,6 +67,7 @@ function Badge({ farbe, children }) {
 export default function Dashboard() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [energyLevel, setEnergyLevel] = useState(() => leseGespeicherteEnergie())
   const [faecher, setFaecher] = useState([])
   const [bloecke, setBloecke] = useState([])
@@ -73,6 +76,37 @@ export default function Dashboard() {
   const [avatarMenuOffen, setAvatarMenuOffen] = useState(false)
   const [activeTab, setActiveTab] = useState('heute')
   const [lernenFallbackAktiv, setLernenFallbackAktiv] = useState(false)
+  const [zeigeSessionToast, setZeigeSessionToast] = useState(
+    Boolean(location.state?.zeigeSessionToast) && leseBlockZaehlerHeute() > 1
+  )
+  const [zeigeWillkommenZurueck, setZeigeWillkommenZurueck] = useState(false)
+  const letzterLoginGeprueft = useRef(false)
+
+  useEffect(() => {
+    // Nur einmal lesen — verhindert, dass ein Reload von /dashboard den Toast erneut zeigt.
+    if (location.state?.zeigeSessionToast) {
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [])
+
+  useEffect(() => {
+    // pruefeUndAktualisiereLetztenLogin() liest und schreibt in einem Schritt — ohne
+    // diesen Guard würde React StrictModes doppelter Effect-Aufruf (nur im Dev-Modus)
+    // den gerade erst geschriebenen Wert sofort wieder lesen und "0 Tage" ergeben.
+    if (letzterLoginGeprueft.current) return
+    letzterLoginGeprueft.current = true
+
+    const tageSeitLetztemLogin = pruefeUndAktualisiereLetztenLogin()
+    if (tageSeitLetztemLogin !== null && tageSeitLetztemLogin > 3) {
+      setZeigeWillkommenZurueck(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!zeigeWillkommenZurueck) return
+    const timer = setTimeout(() => setZeigeWillkommenZurueck(false), 5000)
+    return () => clearTimeout(timer)
+  }, [zeigeWillkommenZurueck])
 
   useEffect(() => {
     async function load() {
@@ -138,6 +172,7 @@ export default function Dashboard() {
   const energiePill = ENERGIE_PILL[energyLevel]
   const initiale = user?.email?.[0]?.toUpperCase() ?? '?'
   const naechsterBlock = findeNaechstenBlock(allBlocksMitFortschritt)
+  const blockZaehlerHeute = leseBlockZaehlerHeute()
 
   function handleLernenClick() {
     if (heutigeItems.length > 0) {
@@ -202,6 +237,25 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-[760px] px-4 pb-24 pt-8 sm:px-8 md:pb-8">
+        {zeigeWillkommenZurueck && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--card-border)] bg-perceive-card px-3 py-2 dark:bg-perceive-darkcard">
+            <img
+              src="/per.png"
+              alt="Per"
+              style={{ width: 32, height: 32, objectFit: 'contain', mixBlendMode: 'multiply' }}
+            />
+            <p className="flex-1 text-sm text-[var(--heading)]">Schön, dass du wieder da bist.</p>
+            <button
+              type="button"
+              onClick={() => setZeigeWillkommenZurueck(false)}
+              aria-label="Schließen"
+              className="text-[var(--muted-2)] transition hover:text-perceive-text dark:hover:text-perceive-bg"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {zeigeLeerenZustand ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <img
@@ -241,6 +295,13 @@ export default function Dashboard() {
                     <span>{energiePill.label}</span>
                   </button>
                 </div>
+
+                {blockZaehlerHeute > 0 && (
+                  <p className="mb-4 text-[13px] font-medium text-perceive-accent">
+                    Du hast heute bereits {blockZaehlerHeute}{' '}
+                    {blockZaehlerHeute === 1 ? 'Block' : 'Blöcke'} gelernt ✓
+                  </p>
+                )}
 
                 {!heroItem ? (
                   <div className="flex items-center gap-4 rounded-xl border border-[var(--card-border)] bg-perceive-card p-5 dark:border-gray-700 dark:bg-perceive-darkcard">
@@ -393,6 +454,13 @@ export default function Dashboard() {
             Zurück
           </button>
         </div>
+      )}
+
+      {zeigeSessionToast && (
+        <SessionToast
+          anzahl={blockZaehlerHeute}
+          onClose={() => setZeigeSessionToast(false)}
+        />
       )}
     </div>
   )
